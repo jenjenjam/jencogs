@@ -127,7 +127,7 @@ class Impersonate(commands.Cog):
     @commands.guild_only()
     @checks.admin()
     @impersonate.command()
-    async def ignore(self, ctx, channel: discord.TextChannel):
+    async def ignorechannel(self, ctx, channel: discord.TextChannel):
         ignore_channels = await self.config.guild(ctx.message.guild).ignore_channels()
         if channel.id in ignore_channels:
             ignore_channels.remove(channel.id)
@@ -142,5 +142,12 @@ class Impersonate(commands.Cog):
             )
             await ctx.send(f"Channel {channel} added to ignored list")
 
-
-      
+    @commands.guild_only()
+    @checks.admin()
+    @impersonate.command()
+    async def setmessagelimit(self, ctx, limit: int = None):
+        await self.config.guild(ctx.message.guild).message_limit.set(
+            limit
+        )
+        await ctx.send(f"Message limit set to {limit}")
+       
