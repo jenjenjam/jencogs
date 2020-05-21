@@ -16,7 +16,7 @@ class Impersonate(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
-        self.config = Config.get_conf(self, 573147218420570)
+        self.config = Config.get_conf(self, 573147218420571)
         self.bot_prefixes = ['&', '-', '.', '#', '\'']
         self.config.register_user(
             markov=None,
@@ -93,7 +93,7 @@ class Impersonate(commands.Cog):
         cfg = self.config.guild(ctx.message.guild)
         limit = await cfg.message_limit()
         
-        date = await self.config.user(ctx.author).markov_date()
+        date = await self.config.user(user).markov_date()
         if force_redo or date is None:
             m = await ctx.send(f"Generating model for {user}...")
             # Make new model
@@ -104,8 +104,8 @@ class Impersonate(commands.Cog):
             # Update model
             m = await ctx.send(f"Updating model for {user}...")
             new_model, new_size = await self.generate_new_model(ctx, user, m, datetime.fromtimestamp(date), limit=limit)
-            old_model = markovify.Text.from_json(await self.config.user(ctx.author).markov())
-            old_size = await self.config.user(ctx.author).markov_size()
+            old_model = markovify.Text.from_json(await self.config.user(user).markov())
+            old_size = await self.config.user(user).markov_size()
             if new_size == 0:
                 model = old_model
             else:
@@ -116,7 +116,7 @@ class Impersonate(commands.Cog):
         else:
             # Reuse old model
             m = await ctx.send(f"Reusing model for {user}")
-            model = markovify.Text.from_json(await self.config.user(ctx.author).markov())
+            model = markovify.Text.from_json(await self.config.user(user).markov())
 
 
         tries = await cfg.tries() 
