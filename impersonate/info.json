@@ -1,0 +1,16 @@
+{
+	"author": [
+		"jenjam"
+	],
+	"description": "Impersonate other users using markov chains. Use [p]impersonate <user> to generate a model and a sentence from that user. By default the model will use all previous messages in all channels. The model is saved an reused and updated lazily if stale.",
+    "install_msg": "Thanks for installing, have fun.",
+	"short": "Impersonate",
+	"tags": [
+		"markov",
+        "fun"
+	],
+	"requirements": [
+        "markovify"
+	],
+	"type": "COG"
+}
