@@ -1,5 +1,4 @@
-from redbot.core import commands
-from redbot.core import Config
+from redbot.core import commands, checks, Config
 import discord
 import os
 from io import BytesIO
@@ -25,6 +24,14 @@ class Impersonate(commands.Cog):
             markov_size=None
         )
 
+        self.config.register_guild(
+            tries=200, 
+            max_overlap_ratio=0.8, 
+            max_overlap_total=20,
+            message_limit=None,
+            ignore_channels=[]
+        )
+
     async def save_model(self, model, user, text_size):
         await self.config.user(user).markov_date.set(
                 datetime.timestamp(datetime.now())
@@ -38,12 +45,14 @@ class Impersonate(commands.Cog):
 
     async def generate_new_model(self, ctx, user, m, limit=None, date=None):
         channels = ctx.guild.text_channels
-            
+        ignore_channels = await self.config.guild(ctx.message.guild).ignore_channels()
+
         history = []
         for c in channels:
-            async for msg in c.history(limit=limit, after=date):
-                if msg.author == user:
-                    history.append(msg.content)
+            if c.id not in ignore_channels:
+                async for msg in c.history(limit=limit, after=date):
+                    if msg.author == user:
+                        history.append(msg.content)
 
         if len(history) == 0:
             await m.edit(content=f"No new messages...")
@@ -61,18 +70,22 @@ class Impersonate(commands.Cog):
         return model, len(history)
 
         
+    @commands.guild_only()
+    @commands.group()
+    async def impersonate(self, cxx):
+        pass
 
     @commands.guild_only()
-    @commands.command()
+    @impersonate.command()
     @commands.cooldown(1, 10, commands.BucketType.user)
-    async def impersonate(self, ctx, user: discord.User = None, limit=None, force_redo: bool = False, sentences=1, tries=200, max_overlap_ratio=0.8, max_overlap_total=20):
+    async def generate(self, ctx, user: discord.User = None, force_redo: bool = False, sentences: int = 1):
+        if not ctx.invoked_subcommand is None:
+            return
         if user is None:
             user = ctx.message.author
-        if sentences <= 0 or sentences > 5 or \
-        tries <= 0 or tries > 1000 or \
-        max_overlap_ratio <= 0 or max_overlap_ratio >= 1 or \
-        max_overlap_total <= 0 or max_overlap_total >= 100:
-            return
+        
+        cfg = self.config.guild(ctx.message.guild)
+        limit = await cfg.message_limit()
         
         date = await self.config.user(ctx.author).markov_date()
         if force_redo or date is None:
@@ -99,6 +112,10 @@ class Impersonate(commands.Cog):
             m = await ctx.send(f"Reusing model for {user}")
             model = markovify.Text.from_json(await self.config.user(ctx.author).markov())
 
+
+        tries = await cfg.tries() 
+        max_overlap_ratio = await cfg.max_overlap_ratio() 
+        max_overlap_total = await cfg.max_overlap_total()
         s = f"{user}: "
         for i in range(sentences):
             pred = model.make_sentence(tries=tries, max_overlap_ratio=max_overlap_ratio, max_overlap_total=max_overlap_total)
@@ -107,6 +124,23 @@ class Impersonate(commands.Cog):
             s = f"{s}. {pred}"
         await ctx.send(s)
 
-        
+    @commands.guild_only()
+    @checks.admin()
+    @impersonate.command()
+    async def ignore(self, ctx, channel: discord.TextChannel):
+        ignore_channels = await self.config.guild(ctx.message.guild).ignore_channels()
+        if channel.id in ignore_channels:
+            ignore_channels.remove(channel.id)
+            await self.config.guild(ctx.message.guild).ignore_channels.set(
+                ignore_channels
+            )
+            await ctx.send(f"Channel {channel} removed from ignored list")
+        else:
+            ignore_channels.append(channel.id)
+            await self.config.guild(ctx.message.guild).ignore_channels.set(
+                ignore_channels
+            )
+            await ctx.send(f"Channel {channel} added to ignored list")
+
 
       
