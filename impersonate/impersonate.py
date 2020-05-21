@@ -50,8 +50,6 @@ class Impersonate(commands.Cog):
         channels = ctx.guild.text_channels
         cfg = self.config.guild(ctx.message.guild)
         history = await cfg.history()
-        print(user.id)
-        print(list(history.keys()))
         if str(user.id) not in list(history.keys()):
             await m.edit(content=f"No data for this user")
             return None, 0
@@ -103,7 +101,6 @@ class Impersonate(commands.Cog):
                 history[str(msg.author.id)].append(msg.clean_content)
                 msg_counter += 1
         
-        print(history)
         await cfg.history.set(
                 history
             )
