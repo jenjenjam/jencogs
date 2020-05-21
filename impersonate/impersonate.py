@@ -17,7 +17,7 @@ class Impersonate(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.get_conf(self, 573147218420570)
-
+        self.bot_prefixes = ['&', '-', '.', '#', '\'']
         self.config.register_user(
             markov=None,
             markov_date=None,
@@ -52,8 +52,8 @@ class Impersonate(commands.Cog):
             if c.id not in ignore_channels:
                 try:
                     async for msg in c.history(limit=limit, after=date):
-                        if msg.author == user:
-                            history.append(msg.content)
+                        if msg.author == user and msg.clean_content[0] not in self.bot_prefixes:
+                            history.append(msg.clean_content)
                 except:
                     pass
 
@@ -86,6 +86,9 @@ class Impersonate(commands.Cog):
             return
         if user is None:
             user = ctx.message.author
+        if sentences <= 0 or sentences >= 10:
+            await ctx.send(f"Invalid num of sentences")
+            return
         
         cfg = self.config.guild(ctx.message.guild)
         limit = await cfg.message_limit()
