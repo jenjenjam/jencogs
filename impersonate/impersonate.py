@@ -50,9 +50,12 @@ class Impersonate(commands.Cog):
         history = []
         for c in channels:
             if c.id not in ignore_channels:
-                async for msg in c.history(limit=limit, after=date):
-                    if msg.author == user:
-                        history.append(msg.content)
+                try:
+                    async for msg in c.history(limit=limit, after=date):
+                        if msg.author == user:
+                            history.append(msg.content)
+                except:
+                    pass
 
         if len(history) == 0:
             await m.edit(content=f"No new messages...")
@@ -116,12 +119,15 @@ class Impersonate(commands.Cog):
         tries = await cfg.tries() 
         max_overlap_ratio = await cfg.max_overlap_ratio() 
         max_overlap_total = await cfg.max_overlap_total()
-        s = f"{user}: "
+        
+        preds = []
         for i in range(sentences):
             pred = model.make_sentence(tries=tries, max_overlap_ratio=max_overlap_ratio, max_overlap_total=max_overlap_total)
             if pred is None:
                 pred = "Generation failed, go bonk Jen"
-            s = f"{s}. {pred}"
+            preds.append(pred)
+        s = f"{user}: {'. '.join(preds)}." 
+
         await ctx.send(s)
 
     @commands.guild_only()
