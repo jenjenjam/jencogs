@@ -1,0 +1,14 @@
+{
+	"author": [
+		"jenjam"
+	],
+	"description": "Limit a set of roles so only 1 can be present. The highest role will be the one that remains",
+    "install_msg": "Thanks for installing, have fun.",
+	"short": "Rolelimit",
+	"tags": [
+		"role",
+        "perms"
+	],
+	"requirements": [],
+	"type": "COG"
+}
