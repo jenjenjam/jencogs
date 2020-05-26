@@ -23,15 +23,14 @@ class RoleLimit(commands.Cog):
         limit_roles = await self.config.guild(user.guild).roles()
         highest_limit_role = None
         to_remove = []
-        for role in user.roles:
-            if role.id in limit_roles:
+        for role_id in limit_roles:
+            role = user.guild.get_role(role_id)
+            if role in user.roles:
                 if highest_limit_role is None:
                     highest_limit_role = role
-                elif role > highest_limit_role:
+                else:
                     to_remove.append(highest_limit_role)
                     highest_limit_role = role
-                elif role < highest_limit_role:
-                    to_remove.append(role)
         if len(to_remove) > 0:
             await user.remove_roles(*to_remove)
 
@@ -44,32 +43,9 @@ class RoleLimit(commands.Cog):
     @commands.guild_only()
     @checks.admin()
     @rolelimit.command()
-    async def add(self, ctx, role: discord.Role):
-        old_roles = await self.config.guild(ctx.message.guild).roles()
-
-        if role.id in old_roles:
-            await ctx.send(f"That role is already added")
-            return
-
-        old_roles.append(role.id)
+    async def set(self, ctx, *roles: discord.Role):
         await self.config.guild(ctx.message.guild).roles.set(
-                old_roles
-            )
-        await self.listroles(ctx)
-
-    @commands.guild_only()
-    @checks.admin()
-    @rolelimit.command()
-    async def remove(self, ctx, role: discord.Role):
-        old_roles = await self.config.guild(ctx.message.guild).roles()
-
-        if not role.id in old_roles:
-            await ctx.send(f"That role is not added")
-            return
-
-        old_roles.remove(role.id)
-        await self.config.guild(ctx.message.guild).roles.set(
-                old_roles
+                [r.id for r in roles]
             )
         await self.listroles(ctx)
 
@@ -79,7 +55,7 @@ class RoleLimit(commands.Cog):
     async def listroles(self, ctx):
         roles = await self.config.guild(ctx.message.guild).roles()
         role_list = ', '.join([f"{str(r)} ({ctx.message.guild.get_role(r)})" for r in roles])
-        await ctx.send(f"Roles to limit: {role_list}")
+        await ctx.send(f"Roles to limit (lowest to highest): {role_list}")
 
     @commands.guild_only()
     @checks.admin()
