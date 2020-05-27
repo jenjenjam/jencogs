@@ -17,7 +17,7 @@ class ContestCount(commands.Cog):
                             voter_server_age: commands.TimedeltaConverter()=None, entries_per_page: int=9):
         timenow = datetime.now()
         def valid_user_vote(u):
-            if u.joined_at is None:
+            if (not hasattr(u, 'joined_at')) or u.joined_at is None:
                 return False
             elif (not voter_server_age is None) and (u.joined_at >= timenow - voter_server_age):
                 return False
