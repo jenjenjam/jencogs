@@ -1,0 +1,13 @@
+{
+	"author": [
+		"jenjam"
+	],
+	"description": "Counts the number of emote reactions for a channel, i.e votes in a contest, supports various vote restrictions",
+    "install_msg": "Thanks for installing, have fun.",
+	"short": "Contestcount",
+	"tags": [
+		"fun"
+	],
+	"requirements": [],
+	"type": "COG"
+}
