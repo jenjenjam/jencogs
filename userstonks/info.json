@@ -1,0 +1,13 @@
+{
+	"author": [
+		"jenjam"
+	],
+	"description": "Tracks user message count and displays in the stonks board",
+    "install_msg": "Thanks for installing, have fun.",
+	"short": "UserStonks",
+	"tags": [
+		"fun"
+	],
+	"requirements": [],
+	"type": "COG"
+}
