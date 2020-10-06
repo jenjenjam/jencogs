@@ -14,9 +14,9 @@ import concurrent.futures
 import functools
 import random
 
-AUTOUPDATE_CHECK_INTERVAL = 60
+AUTOUPDATE_CHECK_INTERVAL = 2*60
 TIME_BUCKET = 5*60
-EXPIRY_TIME = 7*24*60*60
+EXPIRY_TIME = 24*60*60
 
 class UserStonks(commands.Cog):
     
@@ -63,7 +63,11 @@ class UserStonks(commands.Cog):
                         if msg is None:
                             continue
 
-                        new_embed = await self.get_leaderboard(guild, b["length"], b["time_period"], b["has_comparison"])
+                        if "start_time" in b:
+                            new_embed = await self.get_leaderboard(guild, b["length"], start_time=b["start_time"], update_period=b["update_period"], has_comparison=b["has_comparison"])
+                        else:
+                            new_embed = await self.get_leaderboard(guild, b["length"], time_period=b["time_period"], has_comparison=b["has_comparison"])
+
                         if new_embed is None:
                             continue
                         await msg.edit(embed=new_embed)
@@ -83,13 +87,12 @@ class UserStonks(commands.Cog):
         self,
         guild,
         amount,
-        time_period
+        time_period,
+        time_end,
+        time_start,
+        time_comp_end,
+        time_comp_start
     ):
-       
-
-        time_end =  int(datetime.datetime.now(datetime.timezone.utc).timestamp() / TIME_BUCKET)
-        time_start =  int((datetime.datetime.now(datetime.timezone.utc).timestamp() - time_period) / TIME_BUCKET)
-        time_prev_start =  int((datetime.datetime.now(datetime.timezone.utc).timestamp() - 2*time_period) / TIME_BUCKET)
 
         result = self.cursor.execute(
             'WITH now AS ('
@@ -107,13 +110,13 @@ class UserStonks(commands.Cog):
             'SELECT now.*, prev.total, prev.rank_no FROM now '
             'LEFT JOIN prev ON now.user_id = prev.user_id',
             (guild.id, time_start, time_end, amount, 
-            guild.id, time_prev_start, time_start)
+            guild.id, time_comp_start, time_comp_end)
         ).fetchall()
         if len(result) == 0 or not result[0]:
-            return discord.Embed.from_dict( {"title": "STONKS", "description": f"Found nothing in the db :("} )
-
-        time = f"{int(time_period // (24*60*60))}d{int((time_period % (24*60*60)) // (3600))}h"
-        embed = discord.Embed.from_dict( {"title": "STONKS", "description": f"Showing the stonks for top {amount} users for the past {time}, compared with previous stonks"} )
+            return discord.Embed.from_dict( {"title": "STONKS", "description": f"No data yet :("} )
+        
+        time = f"{int(time_period // (24*60*60))}d{int((time_period % (24*60*60)) // 3600)}h{int((time_period % 3600) // 60)}m"
+        embed = discord.Embed.from_dict( {"title": "STONKS", "description": f"Showing the stonks for top {amount} users for the past {time}"} )
         embed.colour = random.randint(0, 0xffffff)
         msg = ""
         for (i, value) in enumerate(result):  
@@ -127,12 +130,12 @@ class UserStonks(commands.Cog):
             prev_i = value[3]
             def diff(old, new):
                 if old is None or new is None:
-                    return "/"
+                    return "="
                 n = new - old
                 if n == 0:
                     return "="
                 return f"▲{n}" if n >= 0 else f"▼{abs(n)}"   
-            msg += f"#**{i+1}** ({diff(i+1, prev_i)})   `{name}`: **{count}** ({diff(prev_count, count)})\n"
+            msg += f"#**{i+1}** ({diff(i+1, prev_i)})   `{name}`: **{count}** ({diff(prev_count or 0, count)})\n"
         embed.add_field(name="Leaderboard", value=msg, inline=True)
         return embed
 
@@ -158,7 +161,7 @@ class UserStonks(commands.Cog):
         if len(result) == 0 or not result[0]:
             return discord.Embed.from_dict( {"title": "STONKS", "description": f"Found nothing in the db :("} )
 
-        time = f"{int(time_period // (24*60*60))}d{int((time_period % (24*60*60)) // (3600))}h"
+        time = f"{int(time_period // (24*60*60))}d{int((time_period % (24*60*60)) // 3600)}h{int((time_period % 3600) // 60)}m"
         embed = discord.Embed.from_dict( {"title": "STONKS", "description": f"Showing the stonks for top {amount} users for the past {time}"} )
         embed.colour = random.randint(0, 0xffffff)
         msg = ""
@@ -178,11 +181,25 @@ class UserStonks(commands.Cog):
         self,
         guild,
         length,
-        time_period,
-        has_comparison
+        time_period=None,
+        start_time=None,
+        update_period=None,
+        has_comparison=False
     ):
         if has_comparison:
-            return await self.get_comp_leaderboard(guild, length, time_period)
+            if start_time is not None:
+                now = datetime.datetime.now(datetime.timezone.utc).timestamp()
+                time_period = now - start_time
+                time_end =  int(now / TIME_BUCKET)
+                time_start =  int(start_time / TIME_BUCKET)
+                time_comp_end =  int((now - update_period) / TIME_BUCKET)
+                time_comp_start =  time_start
+            else:
+                time_end =  int(datetime.datetime.now(datetime.timezone.utc).timestamp() / TIME_BUCKET)
+                time_start =  int((datetime.datetime.now(datetime.timezone.utc).timestamp() - time_period) / TIME_BUCKET)
+                time_comp_end =  int((datetime.datetime.now(datetime.timezone.utc).timestamp() - time_period) / TIME_BUCKET)
+                time_comp_start =  int((datetime.datetime.now(datetime.timezone.utc).timestamp() - 2*time_period) / TIME_BUCKET)
+            return await self.get_comp_leaderboard(guild, length, time_period, time_end, time_start, time_comp_end, time_comp_start)
         else:
             return await self.get_simple_leaderboard(guild, length, time_period)
 
@@ -194,13 +211,12 @@ class UserStonks(commands.Cog):
         pass
 
     @userstonks.command()
-    async def staticleaderboard(self, ctx, length: int=10, time_period: int=24*60*60, has_comparison: bool=True):
+    async def staticleaderboard(self, ctx, length: int=10, time_period: int=24*60*60):
         """
         Generates a leaderboard
         
         Use the optional parameter "time_period" to set the time period to measure back to in seconds.
-        Use the optional parameter "length" to change the number of members that are displayed.
-        Use the optional parameter "has_comparison" to display leaderboards with a comparison to the previous period.
+        Use the optional parameter "length" to change the number of members that are displayed
         """
 
         guild = ctx.guild
@@ -213,12 +229,54 @@ class UserStonks(commands.Cog):
 
 
         with ctx.typing():
-            e = await self.get_leaderboard(guild, length, time_period, has_comparison)
+            e = await self.get_simple_leaderboard(guild, length, time_period)
 
         try:
             await ctx.send(embed=e)
         except discord.errors.HTTPException:
             await ctx.send('The result is too long to send.')
+
+
+    @userstonks.command()
+    async def startleaderboard(self, ctx, update_period: int=30*60, length: int=10, has_comparison: bool=True):
+        """
+        Generates an autoupdating leaderboard starting from zero
+        
+        Use the optional parameter "update_period" to set the update period for the leaderboard.
+        Use the optional parameter "length" to change the number of members that are displayed.
+        Use the optional parameter "has_comparison" to display leaderboards with changes from previous period.
+        """
+        
+        guild = ctx.guild
+        if update_period < TIME_BUCKET:
+            return await ctx.send(f'Update period must be more than {TIME_BUCKET}')
+        if length <= 0:
+            return await ctx.send('At least one member needs to be displayed.')
+        if length > 100:
+            return await ctx.send('You cannot request more than 100 members.')
+
+        start_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
+        with ctx.typing():
+            e = await self.get_leaderboard(guild, length, start_time=start_time, update_period=update_period, has_comparison=has_comparison)
+
+        try:
+            embed_sent = await ctx.send(embed=e)
+        except discord.errors.HTTPException:
+            await ctx.send('The leaderboard is too long to send.')
+            return
+        msg = await ctx.fetch_message(embed_sent.id)
+
+        leaderboards = await self.config.guild(guild).autoLeaderboards()
+        leaderboards.append({
+            "messageId": msg.id,
+            "channelId": msg.channel.id,
+            "update_period": update_period,
+            "next_update": datetime.datetime.timestamp(datetime.datetime.now()) + update_period,
+            "length": length,
+            "start_time": start_time,
+            "has_comparison": has_comparison
+        })
+        await self.config.guild(guild).autoLeaderboards.set(leaderboards)
 
 
     @userstonks.command()
@@ -233,8 +291,8 @@ class UserStonks(commands.Cog):
         """
         
         guild = ctx.guild
-        if update_period < AUTOUPDATE_CHECK_INTERVAL / 2:
-            return await ctx.send(f'Update period must be more than {AUTOUPDATE_CHECK_INTERVAL / 2}')
+        if update_period < TIME_BUCKET:
+            return await ctx.send(f'Update period must be more than {TIME_BUCKET}')
         if time_period < TIME_BUCKET:
             return await ctx.send(f'Time period must be more than {TIME_BUCKET}')
         if length <= 0:
@@ -243,7 +301,7 @@ class UserStonks(commands.Cog):
             return await ctx.send('You cannot request more than 100 members.')
 
         with ctx.typing():
-            e = await self.get_leaderboard(guild, length, time_period, has_comparison)
+            e = await self.get_leaderboard(guild, length, time_period=time_period, has_comparison=has_comparison)
 
         try:
             embed_sent = await ctx.send(embed=e)
@@ -265,7 +323,12 @@ class UserStonks(commands.Cog):
         await self.config.guild(guild).autoLeaderboards.set(leaderboards)
 
     @userstonks.command()
-    async def deleteauto(self, ctx, id: int=None):
+    async def deleteauto(self, ctx, id: str=None):
+        """
+        Remove a leaderboard from auto updating. Without id it lists all active leaderboards
+        
+        Use the optional parameter "id" to denote the id to delete or "all" if all leaderboards should be deleted.
+        """
         leaderboards = await self.config.guild(ctx.guild).autoLeaderboards()
         if id is None:
             msg = "Leaderboards: (use `deleteauto id` to remove from the auto update list)\n"
@@ -283,7 +346,12 @@ class UserStonks(commands.Cog):
                 except:
                     msg += f"id: {i} = failed to load leaderboard\n"
             await ctx.send(msg)
+        elif str(id) == "all":
+            leaderboards = []
+            await self.config.guild(ctx.guild).autoLeaderboards.set(leaderboards)
+            await ctx.send("Removed all leaderboards from auto update list")
         else:
+            id = int(id)
             if id < 0 or id >= len(leaderboards):
                 await ctx.send("Invalid id")
                 return
