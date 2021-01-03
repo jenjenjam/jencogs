@@ -3,6 +3,7 @@ from redbot.core.utils import AsyncIter, menus
 from redbot.core.utils.predicates import MessagePredicate
 import discord
 from datetime import datetime
+import typing
 
 class ContestCount(commands.Cog):
     
@@ -13,8 +14,12 @@ class ContestCount(commands.Cog):
     @commands.guild_only()
     @checks.admin()
     @commands.command()
-    async def contestcount(self, ctx, channel: discord.TextChannel, emote: discord.Emoji, show_invalid=True, 
-                            voter_server_age: commands.TimedeltaConverter()=None, entries_per_page: int=9):
+    async def contestcount(self, ctx, channel: discord.TextChannel,
+                            emote: str,
+                            show_invalid: bool=True, 
+                            voter_server_age: commands.TimedeltaConverter()=None,
+                            entries_per_page: int=9,
+                            *other_emotes):
         timenow = datetime.now()
         def valid_user_vote(u):
             if (not hasattr(u, 'joined_at')) or u.joined_at is None:
@@ -31,7 +36,7 @@ class ContestCount(commands.Cog):
                 "invalid_votes": 0
             }
             for r in message.reactions:
-                if r.emoji == emote:
+                if str(r.emoji) == emote or str(r.emoji) in other_emotes:
                     all_votes = await r.users().flatten()
                     entry["valid_votes"] = len(list(filter(valid_user_vote, all_votes)))
                     entry["invalid_votes"] = len(all_votes) - entry["valid_votes"]
